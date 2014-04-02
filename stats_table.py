@@ -1,51 +1,66 @@
-from stats_row import StatsRow
+import pandas as pd
+import numpy as np
 
 class StatsTable:
-    def __init__(self, id, headers, stat_rows, career_row):
-        self.table_name = id
-        self.headers = headers
-        self.stat_rows = self._make_stat_rows(stat_rows)
-        self.career_row = self._make_stat_row(career_row)
+    def __init__(self, stat_dicts, id):
+        self.stat_dicts = stat_dicts
+        self.name = id
+        self.panda, self.career_panda = self.build_data_frames()
+
+    def __getitem__(self, key):
+        if key.lower() == 'career':
+            return self.career_stats()
+
+        try:
+            item = self.panda[key]
+
+        except KeyError:
+            try:
+                item = self.panda.loc[key]
+
+            except KeyError:
+                raise KeyError
+
+            else:
+                return item
+
+        else:
+            return item
 
     def __repr__(self):
-        years = ' '.join(self.get_years())
-        stats = ' '.join(self.headers)
-        return "Table name: " + self.table_name + "\nYears: " + years + "\nStats: " + stats
+        return self.complete_table().__repr__()
 
-    def __getattr__(self, attr):
-        for header in self.headers:
-            if header.lower() == attr.lower():
-                return self.lookup_by_stat(header)
+    def indices(self):
+        return self.panda.index.values
 
-        raise AttributeError
-    
-    def lookup_by_stat(self, header):
-        stats = {}
-        for row in self.stat_rows:
-            stats[row.season] = row.dict[header]
-        return stats
+    def view_stats(self):
+        return self.stats().transpose()
 
-    def get_years(self):
-        years = []
-        for row in self.stat_rows:
-            years.append(row.season)
-        return years
+    def stats(self):
+        return self.panda
 
-    def lookup_by_year(self, year):
-        for row in self.stat_rows:
-            if row.season == year:
-                  return row
+    def view_career_stats(self):
+        return self.career_stats().transpose()
 
-        return false
+    def career_stats(self):
+        return self.career_panda
 
-    def career(self):
-        return self.career_row
+    def view_complete_table(self):
+        return self.complete_table().transpose()
 
-    def _make_stat_rows(self, stat_rows):
-        rows = []
-        for stat_row in stat_rows:
-            rows.append(self._make_stat_row(stat_row))
-        return rows
+    def complete_table(self):
+        return self.panda.join(self.career_panda)
 
-    def _make_stat_row(self, row):
-        return StatsRow(row, self)
+    def build_data_frames(self):
+        series_dict = {}
+        for stat_dict in self.stat_dicts:
+            year = stat_dict.pop('Season')
+            panda = pd.Series(data=stat_dict)
+            series_dict[year] = panda
+
+        career = {'Career': series_dict.pop("Career") }
+
+        data_frame = pd.DataFrame(series_dict)
+        career_frame = pd.DataFrame(career)
+
+        return data_frame, career_frame
